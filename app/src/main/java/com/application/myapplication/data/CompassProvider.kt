@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -42,7 +43,12 @@ class CompassProvider(context: Context) : SensorEventListener {
         if (SensorManager.getRotationMatrix(r, i, gravity, geomagnetic)){
             val orientation = FloatArray(3)
             SensorManager.getOrientation(r, orientation)
-            _azimuth.value = Math.toDegrees(orientation[0].toDouble()).toFloat()
+            var degrees = Math.toDegrees(orientation[0].toDouble()).toFloat()
+            if (degrees < 0f) {
+                degrees += 360f
+            }
+            _azimuth.value = degrees
+            Log.d("Compass", "azimuth=$degrees")
         }
     }
 

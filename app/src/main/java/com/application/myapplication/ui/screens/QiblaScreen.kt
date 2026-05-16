@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -33,6 +34,7 @@ fun QiblaScreen(viewModel: QiblaViewModel){
     val rotation by viewModel.needleRotation.collectAsState(0f)
     val bear by viewModel.qiblaBearing.collectAsState(0f)
     val userLoc by viewModel.userLocation.collectAsState()
+    val isFacing by viewModel.isFacingQibla.collectAsState(false)
 
     val animatedRotation by animateFloatAsState(targetValue = rotation)
 
@@ -50,7 +52,7 @@ fun QiblaScreen(viewModel: QiblaViewModel){
         )
         Spacer(modifier = Modifier.height(60.dp))
 
-        Box(
+        Box(modifier = Modifier.size(300.dp),
             contentAlignment = Alignment.Center
         ){
             Box(
@@ -59,16 +61,20 @@ fun QiblaScreen(viewModel: QiblaViewModel){
                 )
             )
             Box(
-                modifier = Modifier.size(260.dp).rotate(animatedRotation).border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
-            )
+                modifier = Modifier.size(260.dp).rotate(animatedRotation), contentAlignment = Alignment.Center
+            ){
+                Box(modifier = Modifier.fillMaxSize().border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
+                )
+                Box(
+                    modifier = Modifier.align(Alignment.TopCenter).offset(y = (-20).dp).size(40.dp).background(Color(0xFFC5A059), CircleShape),
+                    contentAlignment = Alignment.Center
+                ){
+                    Text("▲", color = Color.White, fontSize = 12.sp)
+                }
+            }
 
             Text(text = "🕋", fontSize = 80.sp)
-            Box(
-                modifier = Modifier.align(Alignment.TopCenter).offset(y = (-20).dp).size(40.dp).background(Color(0xFFC5A059), CircleShape),
-                contentAlignment = Alignment.Center
-            ){
-                Text("▲", color = Color.White, fontSize = 12.sp)
-            }
+
         }
 
         Spacer(modifier = Modifier.height(50.dp))
@@ -86,27 +92,37 @@ fun QiblaScreen(viewModel: QiblaViewModel){
         )
 
         Spacer(modifier = Modifier.height(40.dp))
-
-        Text(
-            text = "You are facing the \nQibla",
-            color = Color.White,
-            fontSize = 24.sp,
-            textAlign = TextAlign.Center,
-            lineHeight = 34.sp
-        )
-        Text(
-            text = "May Allah accept\nyour prayers.",
-            color = Color.White.copy(alpha = 0.5f),
-            fontSize = 16.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 12.dp)
-        )
+        if (isFacing){
+            Text(
+                text = "You are facing the \nQibla",
+                color = Color.White,
+                fontSize = 24.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 34.sp
+            )
+            Text(
+                text = "May Allah accept\nyour prayers.",
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+        } else {
+            Text(
+                text = "Rotate your phone until the arrow\npoints up, match the arrow",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 24.sp,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+        }
 
         Spacer(modifier = Modifier.weight(1f))
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 40.dp)
+            modifier = Modifier.padding(bottom = 8.dp)
         ) {
             Text("📍", fontSize = 18.sp)
             Spacer(modifier = Modifier.width(8.dp))
@@ -116,6 +132,14 @@ fun QiblaScreen(viewModel: QiblaViewModel){
                 fontSize = 16.sp
             )
         }
+        Text(
+            text = "Made with love by Sami",
+            color = Color(0xFFC5A059).copy(alpha = 0.9f),
+            fontSize = 16.sp,
+            fontStyle = FontStyle.Italic,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 28.dp)
+        )
 
     }
 }
