@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 fun QiblaScreen(viewModel: QiblaViewModel){
     val rotation by viewModel.needleRotation.collectAsState(0f)
     val bear by viewModel.qiblaBearing.collectAsState(0f)
+    val userLoc by viewModel.userLocation.collectAsState()
 
     val animatedRotation by animateFloatAsState(targetValue = rotation)
 
@@ -79,7 +80,7 @@ fun QiblaScreen(viewModel: QiblaViewModel){
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "West",
+            text = if (bear > 270 && bear < 360) "West" else "Direction",
             color = Color.White.copy(alpha = 0.6f),
             fontSize = 20.sp
         )
@@ -110,7 +111,7 @@ fun QiblaScreen(viewModel: QiblaViewModel){
             Text("📍", fontSize = 18.sp)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Makkah, Saudi Arabia",
+                text = if (userLoc != null) "Makkah, Saudi Arabia" else "Finding Location....",
                 color = Color.White,
                 fontSize = 16.sp
             )
