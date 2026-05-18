@@ -6,13 +6,17 @@ import androidx.lifecycle.viewModelScope
 import com.application.myapplication.data.CompassProvider
 import com.application.myapplication.data.LocationProvider
 import com.application.myapplication.domain.QiblaCalculator
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.WhileSubscribed
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
@@ -31,31 +35,66 @@ class QiblaViewModel(private val compassProvider: CompassProvider, private val l
         _locationStarted.value = true
     }
 
-    val qiblaBearing = userLocation.map { location ->
+    val qiblaBearing: StateFlow<Float> = userLocation.map { location ->
         if (location != null) {
             QiblaCalculator.calculateBearing(location.latitude, location.longitude)
         }else {
-            286f
+            DEFAULT_QIBLA_BEARING
         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000),
+        DEFAULT_QIBLA_BEARING)
 
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 286f)
+   val needleRotation: StateFlow<Float> = combine(azimuth, qiblaBearing) {
+       phoneAzimuth: Float, qiblaBearingDegrees: Float ->
+       normalizeDegrees(qiblaBearingDegrees - phoneAzimuth)
+   }.stateIn(
+       scope = viewModelScope,
+       started = SharingStarted.WhileSubscribed(5000),
+       initialValue = 0f
+   )
 
-    val needleRotation: StateFlow<Float> = combine(azimuth, qiblaBearing) {az, bear ->
-        var rotation = bear - az
-        rotation = (rotation + 360f) % 360f
-        rotation
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        0f
-    )
+    private val isInsideQiblaTolerance = needleRotation.map { rotation ->
+        val difference = minOf(rotation, 360f - rotation )
+        difference <= FACING_TOLERANCE_DEGREES
+    }.distinctUntilChanged()
 
-    val isFacingQibla: StateFlow<Boolean> = needleRotation.map { rotation ->
-        val diff = minOf(rotation, 360f - rotation)
-        diff <= 8f
+    val isFacingQibla: StateFlow<Boolean> = isInsideQiblaTolerance.flatMapLatest {
+       isInsideTolerance ->
+        if (isInsideTolerance) {
+            flow {
+                delay(LOCK_DELAY_MILLIS)
+                emit(true)
+            }
+        }else {
+            flowOf(false)
+        }
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         false
     )
+
+    val pointerRotation: StateFlow<Float> = combine(needleRotation, isFacingQibla) {
+        rotation, locked ->
+        if (locked) {
+            0f
+        } else {
+            rotation
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0f
+    )
+
+    private fun normalizeDegrees(value: Float) : Float{
+        return (value + 360f) % 360f
+    }
+
+    companion object {
+        private const val DEFAULT_QIBLA_BEARING = 286f
+        private const val FACING_TOLERANCE_DEGREES = 8f
+
+        private const val LOCK_DELAY_MILLIS = 2_000L
+    }
 }
