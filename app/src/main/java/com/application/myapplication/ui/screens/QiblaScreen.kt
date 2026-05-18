@@ -1,6 +1,12 @@
 package com.application.myapplication.ui.screens
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -21,22 +27,29 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.application.myapplication.R
 
 
 @Composable
 fun QiblaScreen(viewModel: QiblaViewModel){
-    val rotation by viewModel.needleRotation.collectAsState(0f)
-    val bear by viewModel.qiblaBearing.collectAsState(0f)
-    val userLoc by viewModel.userLocation.collectAsState()
+    val rotation by viewModel.pointerRotation.collectAsState(0f)
+    val bearing by viewModel.qiblaBearing.collectAsState(0f)
+    val userLocation by viewModel.userLocation.collectAsState()
     val isFacing by viewModel.isFacingQibla.collectAsState(false)
 
-    val animatedRotation by animateFloatAsState(targetValue = rotation)
+    val animatedRotation by animateFloatAsState(targetValue = rotation,
+        animationSpec = tween (durationMillis = 250),
+        label = "pointerRotation")
 
     Column(
         modifier = Modifier.fillMaxSize().background(Color(0xFF003322)),
@@ -55,38 +68,48 @@ fun QiblaScreen(viewModel: QiblaViewModel){
         Box(modifier = Modifier.size(300.dp),
             contentAlignment = Alignment.Center
         ){
+           if (isFacing) {
+               QiblaRippleEffect()
+           }
             Box(
-                modifier = Modifier.size(300.dp).border(2.dp, Color(0xFFC5A059).copy(alpha = 0.5f),
-                    CircleShape
+                modifier = Modifier.size(300.dp).border(
+                    width = 2.dp,
+                    color = Color(0xFFC5A059).copy(alpha = 0.5f),
+                    shape = CircleShape
                 )
             )
             Box(
-                modifier = Modifier.size(260.dp).rotate(animatedRotation), contentAlignment = Alignment.Center
+                modifier = Modifier.size(260.dp).rotate(animatedRotation),
+                contentAlignment = Alignment.Center
             ){
-                Box(modifier = Modifier.fillMaxSize().border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
-                )
                 Box(
-                    modifier = Modifier.align(Alignment.TopCenter).offset(y = (-20).dp).size(40.dp).background(Color(0xFFC5A059), CircleShape),
-                    contentAlignment = Alignment.Center
-                ){
-                    Text("▲", color = Color.White, fontSize = 12.sp)
-                }
+                    modifier = Modifier.fillMaxSize().border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.2f),
+                        shape = CircleShape
+                    )
+                )
+                Image(
+                    painter = painterResource(id = R.drawable.pointer),
+                    contentDescription = "Qibla pointer",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.align(Alignment.TopCenter).offset(y = (-26).dp).size(88.dp)
+                )
             }
-
-            Text(text = "🕋", fontSize = 80.sp)
+            Text(text = "🕋" , fontSize = 80.sp)
 
         }
 
         Spacer(modifier = Modifier.height(50.dp))
 
         Text(
-            text = "${bear.toInt()}°",
+            text = "${bearing.toInt()}°",
             color = Color.White,
             fontSize = 64.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = if (bear > 270 && bear < 360) "West" else "Direction",
+            text = if (bearing > 270 && bearing < 360) "West" else "Direction",
             color = Color.White.copy(alpha = 0.6f),
             fontSize = 20.sp
         )
@@ -97,6 +120,7 @@ fun QiblaScreen(viewModel: QiblaViewModel){
                 text = "You are facing the \nQibla",
                 color = Color.White,
                 fontSize = 24.sp,
+                fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 lineHeight = 34.sp
             )
@@ -127,7 +151,7 @@ fun QiblaScreen(viewModel: QiblaViewModel){
             Text("📍", fontSize = 18.sp)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = if (userLoc != null) "Makkah, Saudi Arabia" else "Finding Location....",
+                text = if (userLocation != null) "Makkah, Saudi Arabia" else "Finding Location....",
                 color = Color.White,
                 fontSize = 16.sp
             )
@@ -142,4 +166,37 @@ fun QiblaScreen(viewModel: QiblaViewModel){
         )
 
     }
+}
+
+@Composable
+private fun QiblaRippleEffect(){
+    val infiniteTransition = rememberInfiniteTransition(label = "qiblaRipple")
+
+    val rippleScale by infiniteTransition.animateFloat(
+        initialValue = 0.8f,
+        targetValue = 1.25f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rippleScale"
+    )
+
+    val rippleAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rippleAlpha"
+    )
+
+    Box(
+        modifier = Modifier.size(300.dp).scale(rippleScale).graphicsLayer(alpha = rippleAlpha).border(
+            width = 5.dp,
+            color = Color(0xFFC5A059),
+            shape = CircleShape
+        )
+    )
 }
