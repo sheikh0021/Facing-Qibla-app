@@ -20,81 +20,103 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
-class QiblaViewModel(private val compassProvider: CompassProvider, private val locationProvider: LocationProvider): ViewModel() {
+class QiblaViewModel(
+    private val compassProvider: CompassProvider,
+    private val locationProvider: LocationProvider
+) : ViewModel() {
+
     private val _locationStarted = MutableStateFlow(false)
+
     val azimuth = compassProvider.azimuth
+
     val userLocation: StateFlow<Location?> = _locationStarted.flatMapLatest { started ->
         if (started) {
             locationProvider.getLocationUpdates()
-        } else  {
-            kotlinx.coroutines.flow.flowOf(null)
+        } else {
+            flowOf(null)
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
 
-    fun startLocationUpdates(){
+    fun startLocationUpdates() {
         _locationStarted.value = true
     }
 
-    val qiblaBearing: StateFlow<Float> = userLocation.map { location ->
+    val qiblaBearing: StateFlow<Float?> = userLocation.map { location ->
         if (location != null) {
             QiblaCalculator.calculateBearing(location.latitude, location.longitude)
-        }else {
-            DEFAULT_QIBLA_BEARING
+        } else {
+            null
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000),
-        DEFAULT_QIBLA_BEARING)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
 
-   val needleRotation: StateFlow<Float> = combine(azimuth, qiblaBearing) {
-       phoneAzimuth: Float, qiblaBearingDegrees: Float ->
-       normalizeDegrees(qiblaBearingDegrees - phoneAzimuth)
-   }.stateIn(
-       scope = viewModelScope,
-       started = SharingStarted.WhileSubscribed(5000),
-       initialValue = 0f
-   )
+    val needleRotation: StateFlow<Float?> = combine(
+        azimuth,
+        qiblaBearing
+    ) { phoneAzimuth: Float, qiblaBearingDegrees: Float? ->
+        if (qiblaBearingDegrees != null) {
+            normalizeDegrees(qiblaBearingDegrees - phoneAzimuth)
+        } else {
+            null
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
 
     private val isInsideQiblaTolerance = needleRotation.map { rotation ->
-        val difference = minOf(rotation, 360f - rotation )
-        difference <= FACING_TOLERANCE_DEGREES
+        if (rotation != null) {
+            val difference = minOf(rotation, 360f - rotation)
+            difference <= FACING_TOLERANCE_DEGREES
+        } else {
+            false
+        }
     }.distinctUntilChanged()
 
-    val isFacingQibla: StateFlow<Boolean> = isInsideQiblaTolerance.flatMapLatest {
-       isInsideTolerance ->
+    val isFacingQibla: StateFlow<Boolean> = isInsideQiblaTolerance.flatMapLatest { isInsideTolerance ->
         if (isInsideTolerance) {
             flow {
                 delay(LOCK_DELAY_MILLIS)
                 emit(true)
             }
-        }else {
-            flowOf(false)
-        }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        false
-    )
-
-    val pointerRotation: StateFlow<Float> = combine(needleRotation, isFacingQibla) {
-        rotation, locked ->
-        if (locked) {
-            0f
         } else {
-            rotation
+            flowOf(false)
         }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 0f
+        initialValue = false
     )
 
-    private fun normalizeDegrees(value: Float) : Float{
+    val pointerRotation: StateFlow<Float?> = combine(
+        needleRotation,
+        isFacingQibla
+    ) { rotation: Float?, locked: Boolean ->
+        when {
+            rotation == null -> null
+            locked -> 0f
+            else -> rotation
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = null
+    )
+
+    private fun normalizeDegrees(value: Float): Float {
         return (value + 360f) % 360f
     }
 
     companion object {
-        private const val DEFAULT_QIBLA_BEARING = 286f
         private const val FACING_TOLERANCE_DEGREES = 8f
-
         private const val LOCK_DELAY_MILLIS = 2_000L
     }
 }
