@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -41,18 +42,130 @@ import com.application.myapplication.R
 
 
 @Composable
-fun QiblaScreen(viewModel: QiblaViewModel){
-    val rotation by viewModel.pointerRotation.collectAsState(0f)
-    val bearing by viewModel.qiblaBearing.collectAsState(0f)
+fun QiblaScreen(
+    viewModel: QiblaViewModel,
+    hasLocationPermission: Boolean,
+    onRequestLocationPermission: () -> Unit
+) {
+    val rotation by viewModel.pointerRotation.collectAsState(null)
+    val bearing by viewModel.qiblaBearing.collectAsState(null)
     val userLocation by viewModel.userLocation.collectAsState()
     val isFacing by viewModel.isFacingQibla.collectAsState(false)
 
-    val animatedRotation by animateFloatAsState(targetValue = rotation,
-        animationSpec = tween (durationMillis = 250),
-        label = "pointerRotation")
+    val currentRotation = rotation
+    val currentBearing = bearing
+
+    when {
+        !hasLocationPermission -> {
+            PermissionRequiredContent(
+                onRequestLocationPermission = onRequestLocationPermission
+            )
+        }
+
+        userLocation == null || currentBearing == null || currentRotation == null -> {
+            LocatingContent()
+        }
+
+        else -> {
+            QiblaCompassContent(
+                rotation = currentRotation,
+                bearing = currentBearing,
+                isFacing = isFacing
+            )
+        }
+    }
+}
+
+@Composable
+private fun PermissionRequiredContent(
+    onRequestLocationPermission: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF003322))
+            .padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.weight(1f))
+
+        Text(
+            text = "Location permission is required",
+            color = Color.White,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "Facing Qibla needs your device location to calculate the direction to the Kaaba.",
+            color = Color.White.copy(alpha = 0.7f),
+            fontSize = 16.sp,
+            textAlign = TextAlign.Center,
+            lineHeight = 24.sp
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(onClick = onRequestLocationPermission) {
+            Text(text = "Allow location")
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun LocatingContent() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF003322))
+            .padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.weight(1f))
+
+        Text(
+            text = "Locating your position...",
+            color = Color.White,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "The Qibla direction will appear after your location is found.",
+            color = Color.White.copy(alpha = 0.7f),
+            fontSize = 16.sp,
+            textAlign = TextAlign.Center,
+            lineHeight = 24.sp
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun QiblaCompassContent(
+    rotation: Float,
+    bearing: Float,
+    isFacing: Boolean
+) {
+    val animatedRotation by animateFloatAsState(
+        targetValue = rotation,
+        animationSpec = tween(durationMillis = 250),
+        label = "pointerRotation"
+    )
 
     Column(
-        modifier = Modifier.fillMaxSize().background(Color(0xFF003322)),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF003322)),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(60.dp))
@@ -63,41 +176,55 @@ fun QiblaScreen(viewModel: QiblaViewModel){
             fontSize = 24.sp,
             fontWeight = FontWeight.Medium
         )
+
         Spacer(modifier = Modifier.height(60.dp))
 
-        Box(modifier = Modifier.size(300.dp),
+        Box(
+            modifier = Modifier.size(300.dp),
             contentAlignment = Alignment.Center
-        ){
-           if (isFacing) {
-               QiblaRippleEffect()
-           }
+        ) {
+            if (isFacing) {
+                QiblaRippleEffect()
+            }
+
             Box(
-                modifier = Modifier.size(300.dp).border(
-                    width = 2.dp,
-                    color = Color(0xFFC5A059).copy(alpha = 0.5f),
-                    shape = CircleShape
-                )
-            )
-            Box(
-                modifier = Modifier.size(260.dp).rotate(animatedRotation),
-                contentAlignment = Alignment.Center
-            ){
-                Box(
-                    modifier = Modifier.fillMaxSize().border(
-                        width = 1.dp,
-                        color = Color.White.copy(alpha = 0.2f),
+                modifier = Modifier
+                    .size(300.dp)
+                    .border(
+                        width = 2.dp,
+                        color = Color(0xFFC5A059).copy(alpha = 0.5f),
                         shape = CircleShape
                     )
+            )
+
+            Box(
+                modifier = Modifier
+                    .size(260.dp)
+                    .rotate(animatedRotation),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(
+                            width = 1.dp,
+                            color = Color.White.copy(alpha = 0.2f),
+                            shape = CircleShape
+                        )
                 )
+
                 Image(
                     painter = painterResource(id = R.drawable.pointer),
                     contentDescription = "Qibla pointer",
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.align(Alignment.TopCenter).offset(y = (-26).dp).size(88.dp)
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = (-26).dp)
+                        .size(88.dp)
                 )
             }
-            Text(text = "🕋" , fontSize = 80.sp)
 
+            Text(text = "Kaaba", color = Color.White, fontSize = 24.sp)
         }
 
         Spacer(modifier = Modifier.height(50.dp))
@@ -108,22 +235,25 @@ fun QiblaScreen(viewModel: QiblaViewModel){
             fontSize = 64.sp,
             fontWeight = FontWeight.Bold
         )
+
         Text(
-            text = if (bearing > 270 && bearing < 360) "West" else "Direction",
+            text = "Direction to Kaaba",
             color = Color.White.copy(alpha = 0.6f),
             fontSize = 20.sp
         )
 
         Spacer(modifier = Modifier.height(40.dp))
-        if (isFacing){
+
+        if (isFacing) {
             Text(
-                text = "You are facing the \nQibla",
+                text = "You are facing the\nKaaba",
                 color = Color.White,
-                fontSize = 24.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 lineHeight = 34.sp
             )
+
             Text(
                 text = "May Allah accept\nyour prayers.",
                 color = Color.White.copy(alpha = 0.5f),
@@ -133,7 +263,7 @@ fun QiblaScreen(viewModel: QiblaViewModel){
             )
         } else {
             Text(
-                text = "Rotate your phone until the arrow\npoints up, match the arrow",
+                text = "Rotate your phone until the pointer\nsettles toward the Kaaba",
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 16.sp,
                 textAlign = TextAlign.Center,
@@ -148,14 +278,15 @@ fun QiblaScreen(viewModel: QiblaViewModel){
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 8.dp)
         ) {
-            Text("📍", fontSize = 18.sp)
+            Text("Location", color = Color.White, fontSize = 16.sp)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = if (userLocation != null) "Makkah, Saudi Arabia" else "Finding Location....",
-                color = Color.White,
+                text = "Found",
+                color = Color.White.copy(alpha = 0.7f),
                 fontSize = 16.sp
             )
         }
+
         Text(
             text = "Made with love by Sami",
             color = Color(0xFFC5A059).copy(alpha = 0.9f),
@@ -164,12 +295,11 @@ fun QiblaScreen(viewModel: QiblaViewModel){
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(bottom = 28.dp)
         )
-
     }
 }
 
 @Composable
-private fun QiblaRippleEffect(){
+private fun QiblaRippleEffect() {
     val infiniteTransition = rememberInfiniteTransition(label = "qiblaRipple")
 
     val rippleScale by infiniteTransition.animateFloat(
@@ -193,10 +323,14 @@ private fun QiblaRippleEffect(){
     )
 
     Box(
-        modifier = Modifier.size(300.dp).scale(rippleScale).graphicsLayer(alpha = rippleAlpha).border(
-            width = 5.dp,
-            color = Color(0xFFC5A059),
-            shape = CircleShape
-        )
+        modifier = Modifier
+            .size(300.dp)
+            .scale(rippleScale)
+            .graphicsLayer(alpha = rippleAlpha)
+            .border(
+                width = 5.dp,
+                color = Color(0xFFC5A059),
+                shape = CircleShape
+            )
     )
 }
