@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -39,46 +40,88 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.application.myapplication.R
+import com.application.myapplication.location.LocationGateState
 
 
 @Composable
 fun QiblaScreen(
     viewModel: QiblaViewModel,
-    hasLocationPermission: Boolean,
-    onRequestLocationPermission: () -> Unit
+    locationGateState: LocationGateState,
+    onRequestLocationPermission: () -> Unit,
+    onEnableDeviceLocation: () -> Unit,
+    onOpenAppSettings: () -> Unit
 ) {
     val rotation by viewModel.pointerRotation.collectAsState(null)
     val bearing by viewModel.qiblaBearing.collectAsState(null)
     val userLocation by viewModel.userLocation.collectAsState()
     val isFacing by viewModel.isFacingQibla.collectAsState(false)
 
-    val currentRotation = rotation
-    val currentBearing = bearing
+    when (locationGateState) {
+        LocationGateState.PERMISSION_REQUIRED -> {
+            PermissionRequiredContent(onRequestLocationPermission = onRequestLocationPermission)
+        }
 
-    when {
-        !hasLocationPermission -> {
-            PermissionRequiredContent(
-                onRequestLocationPermission = onRequestLocationPermission
+        LocationGateState.LOCATION_DISABLED -> {
+            LocationDisabledContent(
+                onEnableDeviceLocation = onEnableDeviceLocation,
+                onOpenAppSettings = onOpenAppSettings
             )
         }
 
-        userLocation == null || currentBearing == null || currentRotation == null -> {
-            LocatingContent()
-        }
-
-        else -> {
-            QiblaCompassContent(
-                rotation = currentRotation,
-                bearing = currentBearing,
-                isFacing = isFacing
-            )
+        LocationGateState.READY -> {
+            when {
+                userLocation == null || bearing == null || rotation == null -> {
+                    LocatingContent()
+                }
+                else -> {
+                    QiblaCompassContent(
+                        rotation = rotation!!,
+                        bearing = bearing!!,
+                        isFacing = isFacing
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun PermissionRequiredContent(
-    onRequestLocationPermission: () -> Unit
+private fun PermissionRequiredContent(onRequestLocationPermission: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF003322))
+            .padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = "Location permission is required",
+            color = Color.White,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Facing Qibla needs permission to read your location and calculate the direction to the Kaaba.",
+            color = Color.White.copy(alpha = 0.7f),
+            fontSize = 16.sp,
+            textAlign = TextAlign.Center,
+            lineHeight = 24.sp
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onRequestLocationPermission) {
+            Text("Allow location")
+        }
+        Spacer(modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun LocationDisabledContent(
+    onEnableDeviceLocation: () -> Unit,
+    onOpenAppSettings: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -88,32 +131,37 @@ private fun PermissionRequiredContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.weight(1f))
-
         Text(
-            text = "Location permission is required",
+            text = "Turn on device location",
             color = Color.White,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center
         )
-
         Spacer(modifier = Modifier.height(16.dp))
-
         Text(
-            text = "Facing Qibla needs your device location to calculate the direction to the Kaaba.",
+            text = "You allowed the app, but your phone's Location toggle is still off.\n\nTap the button below — Android will ask you to turn it on inside the app.",
             color = Color.White.copy(alpha = 0.7f),
             fontSize = 16.sp,
             textAlign = TextAlign.Center,
             lineHeight = 24.sp
         )
-
         Spacer(modifier = Modifier.height(24.dp))
-
-        Button(onClick = onRequestLocationPermission) {
-            Text(text = "Allow location")
+        Button(onClick = onEnableDeviceLocation) {
+            Text("Turn on location")
         }
-
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedButton(onClick = onOpenAppSettings) {
+            Text("Open app settings", color = Color.White)
+        }
         Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = "Made with love by Sami",
+            color = Color(0xFFC5A059).copy(alpha = 0.9f),
+            fontSize = 16.sp,
+            fontStyle = FontStyle.Italic,
+            modifier = Modifier.padding(bottom = 28.dp)
+        )
     }
 }
 
@@ -127,7 +175,6 @@ private fun LocatingContent() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.weight(1f))
-
         Text(
             text = "Locating your position...",
             color = Color.White,
@@ -135,165 +182,89 @@ private fun LocatingContent() {
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center
         )
-
         Spacer(modifier = Modifier.height(16.dp))
-
         Text(
-            text = "The Qibla direction will appear after your location is found.",
+            text = "Go near a window or step outside if this takes long.",
             color = Color.White.copy(alpha = 0.7f),
             fontSize = 16.sp,
-            textAlign = TextAlign.Center,
-            lineHeight = 24.sp
+            textAlign = TextAlign.Center
         )
-
         Spacer(modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
-private fun QiblaCompassContent(
-    rotation: Float,
-    bearing: Float,
-    isFacing: Boolean
-) {
+private fun QiblaCompassContent(rotation: Float, bearing: Float, isFacing: Boolean) {
     val animatedRotation by animateFloatAsState(
         targetValue = rotation,
-        animationSpec = tween(durationMillis = 250),
+        animationSpec = tween(250),
         label = "pointerRotation"
     )
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF003322)),
+        modifier = Modifier.fillMaxSize().background(Color(0xFF003322)),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(60.dp))
-
-        Text(
-            text = "Qibla Direction",
-            color = Color.White,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Medium
-        )
-
+        Text("Qibla Direction", color = Color.White, fontSize = 24.sp)
         Spacer(modifier = Modifier.height(60.dp))
 
-        Box(
-            modifier = Modifier.size(300.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isFacing) {
-                QiblaRippleEffect()
-            }
-
+        Box(modifier = Modifier.size(300.dp), contentAlignment = Alignment.Center) {
+            if (isFacing) QiblaRippleEffect()
             Box(
-                modifier = Modifier
-                    .size(300.dp)
-                    .border(
-                        width = 2.dp,
-                        color = Color(0xFFC5A059).copy(alpha = 0.5f),
-                        shape = CircleShape
-                    )
+                modifier = Modifier.size(300.dp).border(2.dp, Color(0xFFC5A059).copy(0.5f), CircleShape)
             )
-
             Box(
-                modifier = Modifier
-                    .size(260.dp)
-                    .rotate(animatedRotation),
+                modifier = Modifier.size(260.dp).rotate(animatedRotation),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .border(
-                            width = 1.dp,
-                            color = Color.White.copy(alpha = 0.2f),
-                            shape = CircleShape
-                        )
+                    modifier = Modifier.fillMaxSize().border(1.dp, Color.White.copy(0.2f), CircleShape)
                 )
-
                 Image(
-                    painter = painterResource(id = R.drawable.pointer),
+                    painter = painterResource(R.drawable.pointer),
                     contentDescription = "Qibla pointer",
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .offset(y = (-26).dp)
-                        .size(88.dp)
+                    modifier = Modifier.align(Alignment.TopCenter).offset(y = (-26).dp).size(88.dp)
                 )
             }
-
-            Text(text = "Kaaba", color = Color.White, fontSize = 24.sp)
+            Text("Kaaba", color = Color.White, fontSize = 24.sp)
         }
 
         Spacer(modifier = Modifier.height(50.dp))
-
-        Text(
-            text = "${bearing.toInt()}°",
-            color = Color.White,
-            fontSize = 64.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Direction to Kaaba",
-            color = Color.White.copy(alpha = 0.6f),
-            fontSize = 20.sp
-        )
-
+        Text("${bearing.toInt()}°", color = Color.White, fontSize = 64.sp, fontWeight = FontWeight.Bold)
+        Text("Direction to Kaaba", color = Color.White.copy(0.6f), fontSize = 20.sp)
         Spacer(modifier = Modifier.height(40.dp))
 
         if (isFacing) {
             Text(
-                text = "You are facing the\nKaaba",
-                color = Color.White,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                lineHeight = 34.sp
+                "You are facing the\nKaaba",
+                color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center, lineHeight = 34.sp
             )
-
             Text(
-                text = "May Allah accept\nyour prayers.",
-                color = Color.White.copy(alpha = 0.5f),
-                fontSize = 16.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 12.dp)
+                "May Allah accept\nyour prayers.",
+                color = Color.White.copy(0.5f), fontSize = 16.sp,
+                textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp)
             )
         } else {
             Text(
-                text = "Rotate your phone until the pointer\nsettles toward the Kaaba",
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = 16.sp,
-                textAlign = TextAlign.Center,
-                lineHeight = 24.sp,
-                modifier = Modifier.padding(horizontal = 24.dp)
+                "Rotate your phone until the pointer\nsettles toward the Kaaba",
+                color = Color.White.copy(0.7f), fontSize = 16.sp,
+                textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp)
             )
         }
 
         Spacer(modifier = Modifier.weight(1f))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 8.dp)
-        ) {
+        Row(modifier = Modifier.padding(bottom = 8.dp)) {
             Text("Location", color = Color.White, fontSize = 16.sp)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Found",
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = 16.sp
-            )
+            Spacer(Modifier.width(8.dp))
+            Text("Found", color = Color.White.copy(0.7f), fontSize = 16.sp)
         }
-
         Text(
-            text = "Made with love by Sami",
-            color = Color(0xFFC5A059).copy(alpha = 0.9f),
-            fontSize = 16.sp,
-            fontStyle = FontStyle.Italic,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 28.dp)
+            "Made with love by Sami",
+            color = Color(0xFFC5A059).copy(0.9f), fontSize = 16.sp,
+            fontStyle = FontStyle.Italic, modifier = Modifier.padding(bottom = 28.dp)
         )
     }
 }
@@ -301,36 +272,16 @@ private fun QiblaCompassContent(
 @Composable
 private fun QiblaRippleEffect() {
     val infiniteTransition = rememberInfiniteTransition(label = "qiblaRipple")
-
     val rippleScale by infiniteTransition.animateFloat(
-        initialValue = 0.8f,
-        targetValue = 1.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rippleScale"
+        0.8f, 1.25f,
+        infiniteRepeatable(tween(1200), RepeatMode.Restart), label = "rippleScale"
     )
-
     val rippleAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rippleAlpha"
+        0.35f, 0f,
+        infiniteRepeatable(tween(1200), RepeatMode.Restart), label = "rippleAlpha"
     )
-
     Box(
-        modifier = Modifier
-            .size(300.dp)
-            .scale(rippleScale)
-            .graphicsLayer(alpha = rippleAlpha)
-            .border(
-                width = 5.dp,
-                color = Color(0xFFC5A059),
-                shape = CircleShape
-            )
+        modifier = Modifier.size(300.dp).scale(rippleScale).graphicsLayer { alpha = rippleAlpha }
+            .border(5.dp, Color(0xFFC5A059), CircleShape)
     )
 }

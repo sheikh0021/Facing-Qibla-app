@@ -19,19 +19,17 @@ class LocationProvider(context: Context) {
 
     @SuppressLint("MissingPermission")
     fun getLocationUpdates(): Flow<Location> = callbackFlow {
-        val locationRequest = LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY, 5000
-        ).build()
+        client.lastLocation.addOnSuccessListener { location ->
+            if (location != null) trySend(location)
+        }
 
-        val callback = object : LocationCallback(){
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5_000L).build()
+        val callback = object  : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                result.lastLocation?.let {
-                    trySend(it)
-                }
+                result.lastLocation?.let { trySend(it) }
             }
         }
-        client.requestLocationUpdates(locationRequest, callback, Looper.getMainLooper())
-
-        awaitClose { client.removeLocationUpdates(callback) }
+        client.requestLocationUpdates(request, callback, Looper.getMainLooper())
+        awaitClose { client.removeLocationUpdates(callback)}
     }
 }
